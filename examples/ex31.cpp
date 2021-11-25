@@ -34,6 +34,10 @@
 //               VisIt (visit.llnl.gov) and ParaView (paraview.org) formats.
 //
 //               We recommend viewing examples 1-4 before viewing this example.
+// First we use backward Euler with dt = t_n+1 - t_n
+//
+//                                 k*u(t_n+1) + grad p(t_n+1)   = f(t_n+1)
+//                                 - div u(t_n+1) - p(t_n+1)/dt = g(t_n+1) - p(t_n)/dt
 
 #include "mfem.hpp"
 #include <fstream>
@@ -42,122 +46,6 @@
 
 using namespace std;
 using namespace mfem;
-
-
-class FE_Evolution : public TimeDependentOperator
-{
-private:
-   BilinearForm *M;
-   MixedBilinearForm *B;
-   MINRESSolver solver;
-   TransposeOperator *Bt = NULL;
-   SparseMatrix *MinvBt = NULL;
-   Solver *invM, *invS;
-   SparseMatrix *S = NULL;
-
-   mutable Vector z;
-
-public:
-   bool pa = false;
-   FE_Evolution(BilinearForm &M_, MixedBilinearForm &B_, Array<int> &block_offsets_);
-   //virtual void Mult(const Vector &x, Vector &y) const;
-   //virtual void ImplicitSolve(const double dt, const Vector &x, Vector &k);
-   //virtual ~FE_Evolution();
-};
-
-// Implementation of class FE_Evolution
-FE_Evolution::FE_Evolution(BilinearForm &M_, MixedBilinearForm &B_, Array<int> &block_offsets_)
-   : TimeDependentOperator(M_.Height()), M(&M_), B(&B_), z(M_.Height())
-{
-   BlockOperator darcyOp(block_offsets_);
-   
-   if (pa)
-   {
-      Bt = new TransposeOperator(B);
-
-      darcyOp.SetBlock(0,0, M);
-      darcyOp.SetBlock(0,1, Bt, -1.0);
-      darcyOp.SetBlock(1,0, B, -1.0);
-   }
-   else
-   {
-      SparseMatrix &Mm(M->SpMat());
-      SparseMatrix &Bb(B->SpMat());
-      Bb *= -1.;
-      if (Device::IsEnabled()) { Bb.BuildTranspose(); }
-      Bt = new TransposeOperator(&Bb);
-
-      darcyOp.SetBlock(0,0, &Mm);
-      darcyOp.SetBlock(0,1, Bt);
-      darcyOp.SetBlock(1,0, &Bb);
-   }
-
-   Vector Md(M->Height());
-
-   BlockDiagonalPreconditioner darcyPrec(block_offsets_);
-
-   if (pa)
-   {
-      M->AssembleDiagonal(Md);
-      auto Md_host = Md.HostRead();
-      Vector invMd(M->Height());
-      for (int i=0; i<M->Height(); ++i)
-      {
-         invMd(i) = 1.0 / Md_host[i];
-      }
-
-      Vector BMBt_diag(B->Height());
-      B->AssembleDiagonal_ADAt(invMd, BMBt_diag);
-
-      Array<int> ess_tdof_list;  // empty
-
-      invM = new OperatorJacobiSmoother(Md, ess_tdof_list);
-      invS = new OperatorJacobiSmoother(BMBt_diag, ess_tdof_list);
-   }
-   else
-   {
-      SparseMatrix &Mm(M->SpMat());
-      Mm.GetDiag(Md);
-      Md.HostReadWrite();
-
-      SparseMatrix &Bb(B->SpMat());
-      MinvBt = Transpose(Bb);
-
-      for (int i = 0; i < Md.Size(); i++)
-      {
-         MinvBt->ScaleRow(i, 1./Md(i));
-      }
-      // need to change "Mult" to something else
-      S = Mult(Bb, *MinvBt);
-
-      invM = new DSmoother(Mm);
-
-#ifndef MFEM_USE_SUITESPARSE
-      invS = new GSSmoother(*S);
-#else
-      invS = new UMFPackSolver(*S);
-#endif
-   }
-
-   invM->iterative_mode = false;
-   invS->iterative_mode = false;
-
-   darcyPrec.SetDiagonalBlock(0, invM);
-   darcyPrec.SetDiagonalBlock(1, invS);
-
-   // 11. Solve the linear system with MINRES.
-   //     Check the norm of the unpreconditioned residual.
-   int maxIter(1000);
-   double rtol(1.e-6);
-   double atol(1.e-10);
-
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   solver.SetOperator(darcyOp);
-   solver.SetPreconditioner(darcyPrec);
-   
-}
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -168,15 +56,12 @@ double f_natural(const Vector & x);
 
 int main(int argc, char *argv[])
 {
-   StopWatch chrono;
-
    // 1. Parse command-line options.
    const char *mesh_file = "../data/star.mesh";
    int order = 1;
    bool pa = false;
    const char *device_config = "cpu";
    bool visualization = 1;
-   int ode_solver_type = 4;
    double t_final = 10.0;
    double dt = 0.01;
 
@@ -192,13 +77,6 @@ int main(int argc, char *argv[])
    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                   "--no-visualization",
                   "Enable or disable GLVis visualization.");
-   args.AddOption(&ode_solver_type, "-s", "--ode-solver",
-                  "ODE solver: 1 - Forward Euler,\n\t"
-                  "            2 - RK2 SSP, 3 - RK3 SSP, 4 - RK4, 6 - RK6,\n\t"
-                  "            11 - Backward Euler,\n\t"
-                  "            12 - SDIRK23 (L-stable), 13 - SDIRK33,\n\t"
-                  "            22 - Implicit Midpoint Method,\n\t"
-                  "            23 - SDIRK23 (A-stable), 24 - SDIRK34");
    args.AddOption(&t_final, "-tf", "--t-final",
                   "Final time; start time is 0.");
    args.AddOption(&dt, "-dt", "--time-step",
@@ -289,16 +167,18 @@ int main(int argc, char *argv[])
    gform->Assemble();
    gform->SyncAliasMemory(rhs);
 
-   // 9. Assemble the finite element matrices for the Darcy operator
+   // 9. Assemble the finite element matrices for the Darcy operator with backward Euler
    //
-   //                            D = [ M  B^T ]
-   //                                [ B   0  ]
+   //                            D = [ M  B^T ] [u(t_n+1)] = [f(t_n+1)] + [0     0][u(t_n)]
+   //                                [ B  C/dt] [p(t_n+1)] = [g(t_n+1)] + [0  C/dt][p(t_n)]
    //     where:
    //
    //     M = \int_\Omega k u_h \cdot v_h d\Omega   u_h, v_h \in R_h
    //     B   = -\int_\Omega \div u_h q_h d\Omega   u_h \in R_h, q_h \in W_h
+   //     C   = -\int_\Omega p_h q_h d\Omega        p_h \in W_h, q_h \in W_h
    BilinearForm *mVarf(new BilinearForm(R_space));
    MixedBilinearForm *bVarf(new MixedBilinearForm(R_space, W_space));
+   BilinearForm *cVarf(new BilinearForm(W_space));
 
    if (pa) { mVarf->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    mVarf->AddDomainIntegrator(new VectorFEMassIntegrator(k));
@@ -310,10 +190,11 @@ int main(int argc, char *argv[])
    bVarf->Assemble();
    if (!pa) { bVarf->Finalize(); }
 
-   FE_Evolution oper(mVarf, bVarf, block_offsets);
+   if (pa) { cVarf->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
+   cVarf->AddDomainIntegrator(new MassIntegrator);
+   cVarf->Assemble();
+   if (!pa) { cVarf->Finalize(); }
 
-   //========================================================================
-   /*
    BlockOperator darcyOp(block_offsets);
 
    TransposeOperator *Bt = NULL;
@@ -325,11 +206,14 @@ int main(int argc, char *argv[])
       darcyOp.SetBlock(0,0, mVarf);
       darcyOp.SetBlock(0,1, Bt, -1.0);
       darcyOp.SetBlock(1,0, bVarf, -1.0);
+      darcyOp.SetBlock(1,1, cVarf, -1.0/dt);
    }
    else
    {
       SparseMatrix &M(mVarf->SpMat());
       SparseMatrix &B(bVarf->SpMat());
+      SparseMatrix &C(cVarf->SpMat());
+      C *= -1/dt;
       B *= -1.;
       if (Device::IsEnabled()) { B.BuildTranspose(); }
       Bt = new TransposeOperator(&B);
@@ -337,6 +221,7 @@ int main(int argc, char *argv[])
       darcyOp.SetBlock(0,0, &M);
       darcyOp.SetBlock(0,1, Bt);
       darcyOp.SetBlock(1,0, &B);
+      darcyOp.SetBlock(1,1, &C);
    }
 
    // 10. Construct the operators for preconditioner
@@ -402,14 +287,11 @@ int main(int argc, char *argv[])
    darcyPrec.SetDiagonalBlock(0, invM);
    darcyPrec.SetDiagonalBlock(1, invS);
 
-   // 11. Solve the linear system with MINRES.
-   //     Check the norm of the unpreconditioned residual.
+   // 11a. Solve the linear system with MINRES at each time step
+   // Check the norm of the unpreconditioned residual.
    int maxIter(1000);
    double rtol(1.e-6);
    double atol(1.e-10);
-
-   chrono.Clear();
-   chrono.Start();
    MINRESSolver solver;
    solver.SetAbsTol(atol);
    solver.SetRelTol(rtol);
@@ -417,27 +299,27 @@ int main(int argc, char *argv[])
    solver.SetOperator(darcyOp);
    solver.SetPreconditioner(darcyPrec);
    solver.SetPrintLevel(1);
-   
-   x = 0.0;
-   solver.Mult(rhs, x);
-   if (device.IsEnabled()) { x.HostRead(); }
-   chrono.Stop();
+   // 11b. Perform time-integration
+   int nt = (int) t_final / dt;
+   for (int n = 0; n <= nt; n++)
+   {
+      x = 0.0;
+      solver.Mult(rhs, x);
+      if (device.IsEnabled()) { x.HostRead(); }
 
-   if (solver.GetConverged())
-   {
-      std::cout << "MINRES converged in " << solver.GetNumIterations()
-                << " iterations with a residual norm of "
-                << solver.GetFinalNorm() << ".\n";
+      if (solver.GetConverged())
+      {
+         std::cout << "MINRES converged in " << solver.GetNumIterations()
+                   << " iterations with a residual norm of "
+                   << solver.GetFinalNorm() << ".\n";
+      }
+      else
+      {
+         std::cout << "MINRES did not converge in " << solver.GetNumIterations()
+                   << " iterations. Residual norm is " << solver.GetFinalNorm()
+                   << ".\n";
+      }
    }
-   else
-   {
-      std::cout << "MINRES did not converge in " << solver.GetNumIterations()
-                << " iterations. Residual norm is " << solver.GetFinalNorm()
-                << ".\n";
-   }
-   std::cout << "MINRES solver took " << chrono.RealTime() << "s.\n";
-   */
-   //====================================================================
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
    GridFunction u, p;
