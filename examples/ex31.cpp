@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 
    // 9. Assemble the finite element matrices for the Darcy operator with backward Euler
    //
-   //                            D = [ M  B^T ] [u(t_n+1)] = [f(t_n+1)] + [0     0][u(t_n)]
+   //                                [ M  B^T ] [u(t_n+1)] = [f(t_n+1)] + [0     0][u(t_n)]
    //                                [ B  C/dt] [p(t_n+1)] = [g(t_n+1)] + [0  C/dt][p(t_n)]
    //     where:
    //
@@ -194,7 +194,8 @@ int main(int argc, char *argv[])
    cVarf->AddDomainIntegrator(new MassIntegrator);
    cVarf->Assemble();
    if (!pa) { cVarf->Finalize(); }
-
+   // I need to compute C/dt * p to added to rhs
+   MatrixVectorProductCoefficient Cp (cVarf/dt, pFun_ex);
    BlockOperator darcyOp(block_offsets);
 
    TransposeOperator *Bt = NULL;
@@ -450,9 +451,9 @@ void fFun(const Vector & x, Vector & f)
 
 double gFun(const Vector & x)
 {
-   if (x.Size() == 3)
+   if (x.Size() == 2)
    {
-      return -pFun_ex(x);
+      return pFun_ex(x);
    }
    else
    {
