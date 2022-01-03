@@ -720,6 +720,13 @@ void SparseMatrix::AddMult(const Vector &x, Vector &y, const double a) const
 #endif // CUDA_VERSION >= 10010
 #endif // MFEM_USE_CUDA
    }
+   else if(Device::Allows(Backend::HIP_MASK))
+   {
+     //rocsparse_local_handle handle;
+     rocsparse_handle handle;
+     rocsparse_create_handle(&handle);
+
+   }
    else
    {
       // Native version

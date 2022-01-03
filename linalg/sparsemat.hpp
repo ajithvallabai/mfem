@@ -22,6 +22,8 @@
 #include "../general/globals.hpp"
 #include "densemat.hpp"
 
+#include "rocsparse.h"
+
 namespace mfem
 {
 
