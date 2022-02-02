@@ -354,25 +354,29 @@ void PADGTraceApply2D(const int NF,
             const double b = B(q,d);
             for (int c = 0; c < VDIM; c++)
             {
-               Bu0[q][c] += b*u0[d][c];
-               Bu1[q][c] += b*u1[d][c];
+               Bu0[q][c] += b*1.0;//u0[d][c];
+               Bu1[q][c] += b*1.0;//u1[d][c];
             }
          }
       }
       double DBu[max_Q1D][VDIM];
+      double DBu_A[max_Q1D][VDIM];
       for (int q = 0; q < Q1D; ++q)
       {
          for (int c = 0; c < VDIM; c++)
          {
-            DBu[q][c] = op(q,0,0,f)*Bu0[q][c] + op(q,1,0,f)*Bu1[q][c];
+           DBu[q][c] = op(q,0,0,f)*Bu0[q][c];
+           DBu_A[q][c] = op(q,1,0,f)*Bu1[q][c];
          }
       }
       double BDBu[max_D1D][VDIM];
+      double BDBu_A[max_D1D][VDIM];
       for (int d = 0; d < D1D; ++d)
       {
          for (int c = 0; c < VDIM; c++)
          {
             BDBu[d][c] = 0.0;
+            BDBu_A[d][c] = 0.0;
          }
          for (int q = 0; q < Q1D; ++q)
          {
@@ -380,15 +384,17 @@ void PADGTraceApply2D(const int NF,
             for (int c = 0; c < VDIM; c++)
             {
                BDBu[d][c] += b*DBu[q][c];
+               BDBu_A[d][c] += b*DBu_A[q][c];
             }
          }
          for (int c = 0; c < VDIM; c++)
          {
-            y(d,c,0,f) +=  BDBu[d][c];
-            y(d,c,1,f) += -BDBu[d][c];
+            y(d,c,0,f) +=  BDBu[d][c]*x(d,c,0,f) + DBu_A[d][c]*x(d,c,1,f);
+            y(d,c,1,f) += -BDBu[d][c]*x(d,c,0,f) - BDBu_A[d][c]*x(d,c,1,f);
          }
       }
    });
+   std::cout<<"Here "<<std::endl;
 }
 
 // PA DGTrace Apply 3D kernel for Gauss-Lobatto/Bernstein
@@ -722,7 +728,7 @@ void PADGTraceApplyTranspose2D(const int NF,
    auto x = Reshape(x_.Read(), D1D, VDIM, 2, NF);
    auto y = Reshape(y_.ReadWrite(), D1D, VDIM, 2, NF);
 
-   std::cout<<"Transpose"<<std::endl;
+   //std::cout<<"Transpose"<<std::endl;
 
    MFEM_FORALL(f, NF,
    {

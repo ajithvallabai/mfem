@@ -514,6 +514,10 @@ void EABilinearFormExtension::Assemble()
 
    Array<BilinearFormIntegrator*> &integrators = *a->GetDBFI();
    const int integratorCount = integrators.Size();
+   if ( integratorCount == 0 )
+   {
+       ea_data = 0.0;
+   }
    for (int i = 0; i < integratorCount; ++i)
    {
       integrators[i]->AssembleEA(*a->FESpace(), ea_data, i);
@@ -627,13 +631,15 @@ void EABilinearFormExtension::Mult(const Vector &x, Vector &y) const
                double res = 0.0;
                for (int i = 0; i < NDOFS; i++)
                {
-                  res += A_int(i, j, 0, f)*X(i, 0, f);
+                 //res += A_int(i, j, 0, f)*X(i, 0, f);
+                  res += A_int(i, j, 0, f)*X(j, 0, f);
                }
                Y(j, 0, f) += res;
                res = 0.0;
                for (int i = 0; i < NDOFS; i++)
                {
-                  res += A_int(i, j, 1, f)*X(i, 1, f);
+                 //res += A_int(i, j, 1, f)*X(i, 1, f);
+                  res += A_int(i, j, 1, f)*X(j, 1, f);
                }
                Y(j, 1, f) += res;
             });
@@ -646,13 +652,15 @@ void EABilinearFormExtension::Mult(const Vector &x, Vector &y) const
             double res = 0.0;
             for (int i = 0; i < NDOFS; i++)
             {
-               res += A_ext(i, j, 0, f)*X(i, 0, f);
+              //res += A_ext(i, j, 0, f)*X(i, 0, f);
+               res += A_ext(i, j, 0, f)*X(j, 0, f);
             }
             Y(j, 1, f) += res;
             res = 0.0;
             for (int i = 0; i < NDOFS; i++)
             {
-               res += A_ext(i, j, 1, f)*X(i, 1, f);
+              //res += A_ext(i, j, 1, f)*X(i, 1, f);
+               res += A_ext(i, j, 1, f)*X(j, 1, f);
             }
             Y(j, 0, f) += res;
          });
@@ -753,13 +761,15 @@ void EABilinearFormExtension::MultTranspose(const Vector &x, Vector &y) const
                double res = 0.0;
                for (int i = 0; i < NDOFS; i++)
                {
-                  res += A_int(j, i, 0, f)*X(i, 0, f);
+                 //res += A_int(j, i, 0, f)*X(i, 0, f);
+                  res += A_int(j, i, 0, f)*X(j, 0, f);
                }
                Y(j, 0, f) += res;
                res = 0.0;
                for (int i = 0; i < NDOFS; i++)
                {
-                  res += A_int(j, i, 1, f)*X(i, 1, f);
+                 //res += A_int(j, i, 1, f)*X(i, 1, f);
+                  res += A_int(j, i, 1, f)*X(j, 1, f);
                }
                Y(j, 1, f) += res;
             });
@@ -772,13 +782,15 @@ void EABilinearFormExtension::MultTranspose(const Vector &x, Vector &y) const
             double res = 0.0;
             for (int i = 0; i < NDOFS; i++)
             {
-               res += A_ext(j, i, 0, f)*X(i, 0, f);
+              //res += A_ext(j, i, 0, f)*X(i, 0, f);
+                res += A_ext(j, i, 0, f)*X(j, 0, f);
             }
             Y(j, 1, f) += res;
             res = 0.0;
             for (int i = 0; i < NDOFS; i++)
             {
-               res += A_ext(j, i, 1, f)*X(i, 1, f);
+              //res += A_ext(j, i, 1, f)*X(i, 1, f);
+               res += A_ext(j, i, 1, f)*X(j, 1, f);
             }
             Y(j, 0, f) += res;
          });
