@@ -498,7 +498,8 @@ void PABilinearFormExtension::MultTranspose(const Vector &x, Vector &y) const
 // Data and methods for element-assembled bilinear forms
 EABilinearFormExtension::EABilinearFormExtension(BilinearForm *form)
    : PABilinearFormExtension(form),
-     factorize_face_terms(form->FESpace()->IsDGSpace())
+     //factorize_face_terms(form->FESpace()->IsDGSpace())
+     factorize_face_terms(false) //AV hack
 {
 }
 
