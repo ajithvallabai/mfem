@@ -1624,6 +1624,23 @@ void ParMesh::GroupQuadrilateral(int group, int i, int &face, int &o)
    o = GetQuadOrientation(faces[face]->GetVertices(), shared_quads[squad].v);
 }
 
+void ParMesh::GetSharedEdgeCommunicator(GroupCommunicator& sedge_comm)
+{
+   // initialize sedge_comm
+   Table &gr_sedge = sedge_comm.GroupLDofTable(); // differs from group_sedge
+   gr_sedge.SetDims(GetNGroups(), shared_edges.Size());
+   gr_sedge.GetI()[0] = 0;
+   for (int gr = 1; gr <= GetNGroups(); gr++)
+   {
+      gr_sedge.GetI()[gr] = group_sedge.GetI()[gr-1];
+   }
+   for (int k = 0; k < shared_edges.Size(); k++)
+   {
+      gr_sedge.GetJ()[k] = group_sedge.GetJ()[k];
+   }
+   sedge_comm.Finalize();
+}
+
 void ParMesh::MarkTetMeshForRefinement(DSTable &v_to_v)
 {
    Array<int> order;
@@ -1631,21 +1648,7 @@ void ParMesh::MarkTetMeshForRefinement(DSTable &v_to_v)
 
    // create a GroupCommunicator on the shared edges
    GroupCommunicator sedge_comm(gtopo);
-   {
-      // initialize sedge_comm
-      Table &gr_sedge = sedge_comm.GroupLDofTable(); // differs from group_sedge
-      gr_sedge.SetDims(GetNGroups(), shared_edges.Size());
-      gr_sedge.GetI()[0] = 0;
-      for (int gr = 1; gr <= GetNGroups(); gr++)
-      {
-         gr_sedge.GetI()[gr] = group_sedge.GetI()[gr-1];
-      }
-      for (int k = 0; k < shared_edges.Size(); k++)
-      {
-         gr_sedge.GetJ()[k] = group_sedge.GetJ()[k];
-      }
-      sedge_comm.Finalize();
-   }
+   GetSharedEdgeCommunicator(sedge_comm);
 
    Array<int> sedge_ord(shared_edges.Size());
    Array<Pair<int,int> > sedge_ord_map(shared_edges.Size());

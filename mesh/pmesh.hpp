@@ -32,6 +32,8 @@ class ParPumiMesh;
 class ParMesh : public Mesh
 {
 protected:
+   friend class ParSubMesh;
+
    MPI_Comm MyComm;
    int NRanks, MyRank;
 
@@ -321,6 +323,8 @@ public:
 
    ParNCMesh* pncmesh;
 
+   int *partitioning_cache = nullptr;
+
    int GetNGroups() const { return gtopo.NGroups(); }
 
    ///@{ @name These methods require group > 0
@@ -335,6 +339,8 @@ public:
    void GroupTriangle(int group, int i, int &face, int &o);
    void GroupQuadrilateral(int group, int i, int &face, int &o);
    ///@}
+
+   void GetSharedEdgeCommunicator(GroupCommunicator& sedge_comm);
 
    void GenerateOffsets(int N, HYPRE_BigInt loc_sizes[],
                         Array<HYPRE_BigInt> *offsets[]) const;

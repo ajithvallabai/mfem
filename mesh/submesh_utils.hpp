@@ -9,39 +9,33 @@
 // terms of the BSD-3 license. We welcome feedback and contributions, see file
 // CONTRIBUTING.md for details.
 
-#ifndef MFEM_MESH_HEADERS
-#define MFEM_MESH_HEADERS
 
-// Mesh header file
+#ifndef MFEM_SUBMESH_UTILS
+#define MFEM_SUBMESH_UTILS
 
-#include "vertex.hpp"
-#include "element.hpp"
-#include "point.hpp"
-#include "segment.hpp"
-#include "triangle.hpp"
-#include "quadrilateral.hpp"
-#include "hexahedron.hpp"
-#include "tetrahedron.hpp"
-#include "ncmesh.hpp"
-#include "mesh.hpp"
-#include "mesh_operators.hpp"
+#include <unordered_map>
 #include "submesh.hpp"
-#include "nurbs.hpp"
-#include "wedge.hpp"
-#include "pyramid.hpp"
-
-#ifdef MFEM_USE_MESQUITE
-#include "mesquite.hpp"
-#endif
-
-#ifdef MFEM_USE_MPI
-#include "pncmesh.hpp"
-#include "pmesh.hpp"
 #include "psubmesh.hpp"
-#endif
 
-#ifdef MFEM_USE_PUMI
-#include "pumi.hpp"
-#endif
+namespace mfem
+{
+// TODO: Decide if these are just "submesh" utilities or really general "mesh"
+// utilities
+namespace SubMeshUtils
+{
+struct UniqueIndexGenerator
+{
+    int counter = 0;
+    std::unordered_map<int, int> idx;
+    int Get(int i, bool &new_index);
+};
+
+bool IsSubMesh(const Mesh *m);
+
+bool ElementHasAttribute(const Element &el, const Array<int> &attributes);
+
+std::tuple<Array<int>, Array<int>> AddElementsToMesh(const Mesh& parent, Mesh& mesh, const Array<int> &attributes);
+};
+};
 
 #endif
