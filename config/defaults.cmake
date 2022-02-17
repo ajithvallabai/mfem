@@ -19,7 +19,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 # MFEM options. Set to mimic the default "defaults.mk" file.
-option(MFEM_USE_MPI "Enable MPI parallel build" OFF)
+option(MFEM_USE_MPI "Enable MPI parallel build" ON)
 option(MFEM_USE_METIS "Enable METIS usage" ${MFEM_USE_MPI})
 option(MFEM_USE_EXCEPTIONS "Enable the use of exceptions" OFF)
 option(MFEM_USE_ZLIB "Enable zlib for compressed data streams." OFF)
@@ -98,7 +98,7 @@ set(MFEM_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 # headers and library. If these fail, then standard cmake search is performed.
 # Note: if the variables are already in the cache, they are not overwritten.
 
-set(HYPRE_DIR "${MFEM_DIR}/../hypre/src/hypre" CACHE PATH
+set(HYPRE_DIR "${MFEM_DIR}/../hypre-2.19.0/src/hypre" CACHE PATH
     "Path to the hypre library.")
 # If hypre was compiled to depend on BLAS and LAPACK:
 # set(HYPRE_REQUIRED_PACKAGES "BLAS" "LAPACK" CACHE STRING
@@ -110,7 +110,7 @@ if (MFEM_USE_CUDA)
 endif()
 # HIP dependency for HYPRE is handled in FindHYPRE.cmake.
 
-set(METIS_DIR "${MFEM_DIR}/../metis-4.0" CACHE PATH "Path to the METIS library.")
+set(METIS_DIR "${MFEM_DIR}/../metis-5.1.0" CACHE PATH "Path to the METIS library.")
 
 set(LIBUNWIND_DIR "" CACHE PATH "Path to Libunwind.")
 
